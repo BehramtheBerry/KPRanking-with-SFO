@@ -42,9 +42,34 @@ To run this project locally, follow these steps:
 
 4. Download the datasets (or the datasets will be automatically fetched via HuggingFace datasets library).
 
+## Measuring Dataset Metrics
+
+If you want to measure the following metrics for your own dataset:
+
+- **GKP**: Average Number of Gold Keyphrases per document (title, abstract, full text)
+- **KPL**: Average Keyphrase Length
+- **DL**: Average Document Length (in words)
+
+You can use the script `DatasetMetrics.py` provided in this repository. To run this script:
+
+```bash
+python DatasetMetrics.py --dataset <dataset_name>
+
 ## How to Run
 
 To execute the main script, simply run:
 
 ```bash
 python sfoOnRealDataset.py
+
+## Citation
+If you find this repository helpful for your work, please cite our project:
+
+text
+@misc{Coming Soon}
+License
+This repository is licensed under the MIT License. See LICENSE for more details.
+
+css
+
+This version adds a section on how to measure the GKP, KPL, and DL metrics using the `DatasetMetrics.py` script. It provides a simple instruction on how to run it and what to expect.
