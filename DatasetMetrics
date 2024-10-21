@@ -1,0 +1,53 @@
+from datasets import load_dataset
+import re
+
+# Function to prepare and calculate metrics
+def calculate_metrics(dataset):
+    total_keyphrases = 0
+    total_keyphrase_length = 0
+    total_words_in_documents = 0
+    total_docs = 0
+    total_keyphrase_counts = 0
+
+    for sample in dataset:
+        # Extract title, abstract, and fulltext
+        document = sample['title'] + ' ' + sample['abstract'] + ' ' + sample['fulltext']
+        total_words_in_documents += len(document.split())
+
+        # Extract keyphrases (assuming the keyphrases are stored under 'keywords')
+        keyphrases = sample['keywords']
+        if isinstance(keyphrases, str):
+            # Split keyphrases on semicolons, commas, or newlines
+            keyphrases = re.split(r';|\n|,|\t|:', keyphrases)
+            keyphrases = [kp.strip() for kp in keyphrases if kp.strip()]
+        elif isinstance(keyphrases, list):
+            keyphrases = [kp.strip() for kp in keyphrases if kp.strip()]
+        else:
+            keyphrases = []
+
+        total_keyphrases += len(keyphrases)
+        total_keyphrase_counts += sum([len(kp.split()) for kp in keyphrases])
+        total_docs += 1
+
+    # Calculating GKP, KPL, and DL
+    GKP = total_keyphrases / total_docs if total_docs > 0 else 0
+    KPL = total_keyphrase_counts / total_keyphrases if total_keyphrases > 0 else 0
+    DL = total_words_in_documents / total_docs if total_docs > 0 else 0
+
+    return GKP, KPL, DL
+
+# Loading the dataset and calculating metrics for each
+datasets = {
+    'Inspec': load_dataset('memray/inspec', split='test'),
+    'NUS': load_dataset('memray/nus', split='test'),
+    'SemEval': load_dataset('memray/semeval', split='test')
+}
+
+# Calculate and print metrics for each dataset
+for dataset_name, dataset in datasets.items():
+    GKP, KPL, DL = calculate_metrics(dataset)
+    print(f"Dataset: {dataset_name}")
+    print(f"GKP (Average Number of Gold Keyphrases): {GKP:.2f}")
+    print(f"KPL (Average Keyphrase Length): {KPL:.2f}")
+    print(f"DL (Average Document Length): {DL:.2f}")
+    print("-" * 50)
