@@ -1,0 +1,351 @@
+from datasets import load_dataset
+import matplotlib.pyplot as plt
+import seaborn as sns
+import nltk
+import numpy as np
+import time
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
+import string
+import re
+
+
+# Download NLTK data
+nltk.download('punkt', quiet=True)
+nltk.download('averaged_perceptron_tagger', quiet=True)
+nltk.download('wordnet', quiet=True)
+nltk.download('omw-1.4', quiet=True)
+nltk.download('stopwords', quiet=True)
+
+from nltk.stem import WordNetLemmatizer
+
+# Initialize lemmatizer
+lemmatizer = WordNetLemmatizer()
+
+# Initialize the model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Function to prepare data from dataset
+def prepare_data(dataset):
+    documents = []
+    references = []
+    for sample in dataset:
+        # Extract the document text
+        document = sample['title'] + ' ' + sample['abstract'] + ' ' + sample['fulltext']
+        documents.append(document)
+
+        # Extract the keyphrases
+        keyphrases = sample['keywords']
+
+        if isinstance(keyphrases, str):
+            # Split keyphrases on semicolons, commas, or newlines
+            keyphrases = re.split(r';|\n|,|\t|:', keyphrases)
+            keyphrases = [kp.strip() for kp in keyphrases if kp.strip()]
+        elif isinstance(keyphrases, list):
+            keyphrases = [kp.strip() for kp in keyphrases if kp.strip()]
+        else:
+            keyphrases = []
+
+        references.append([kp.lower() for kp in keyphrases])  # Convert to lowercase for consistency
+    return documents, references
+
+# Function to normalize keyphrases with consistent preprocessing
+def normalize_keyphrase(kp):
+    # Tokenize and remove punctuation
+    tokens = nltk.word_tokenize(kp.lower().translate(str.maketrans('', '', string.punctuation)))
+    
+    # Lemmatize tokens
+    lemmas = [lemmatizer.lemmatize(token) for token in tokens if token not in nltk.corpus.stopwords.words('english')]
+    
+    return ' '.join(lemmas)
+
+
+# Function to extract keyphrases using SFO
+def extract_keyphrases(document, N=5, alpha=0.5):
+    # Step 1: Candidate Keyphrase Extraction
+    sentences = nltk.sent_tokenize(document)
+    tokens = [nltk.word_tokenize(sentence) for sentence in sentences]
+    tokens_flat = [word for sublist in tokens for word in sublist]
+    pos_tags = nltk.pos_tag(tokens_flat)
+
+    # Define a chunk grammar for NP (Noun Phrases)
+    #GRAMMAR = r"""NP:{<NN.*|JJ>*<NN.*>}""" # Noun phrases (NPs) consisting of: Zero or more adjectives (JJ) Followed by one or more nouns (NN)
+    #GRAMMAR = """  NP:{<JJ|VBG>*<NN.*>{0,3}}""" # Noun phrases (NPs) consisting of: Zero or more adjectives (JJ) or present participles (VBG) Followed by one to three nouns (NN)
+    #GRAMMAR = """  NP:{<NN.*|JJ|VBG|VBN>*<NN.*>}""" # NPs consisting of: Zero or more adjectives (JJ), present participles (VBG), or past participles (VBN) Followed by one or more nouns (NN)
+
+    GRAMMAR = """
+    NP:
+        {<NN.*>+<POS><NN.*>+}               # Possessive noun phrases
+        {<VBG><NN.*>+}                      # Gerund verbs followed by nouns
+        {<NN.*>+<NN.*>+}                    # Consecutive nouns (noun compounds)
+        {<RB.*>*<JJ.*>*<NN.*>+}             # Adverbs, adjectives, nouns
+        {<NNP>+}                            # Proper nouns
+        {<VBG><IN><NN.*>+}                  # Gerund verb + preposition + noun
+        {<IN|CC><DT>?<JJ.*>*<NN.*>+}        # Preposition/Conjunction + Determiner + Noun Phrase
+    """
+
+
+    cp = nltk.RegexpParser(GRAMMAR)
+    tree = cp.parse(pos_tags)
+
+    # Extract NPs
+    def get_np_chunks(tree):
+        nps = []
+        for subtree in tree.subtrees(filter=lambda t: t.label() == 'NP'):
+            np = ' '.join(word for word, pos in subtree.leaves())
+            nps.append(np)
+        return nps
+
+    candidate_keyphrases = get_np_chunks(tree)
+    candidate_keyphrases = list(set(candidate_keyphrases))  # Remove duplicates
+
+    if len(candidate_keyphrases) == 0:
+        return [], {}
+
+    # Step 2: Embedding Generation
+    candidate_embeddings_array = model.encode(candidate_keyphrases)
+    document_embedding = model.encode([document])[0]
+    candidate_embeddings = dict(zip([kp.lower() for kp in candidate_keyphrases], candidate_embeddings_array))  # Convert keys to lowercase
+
+    # Step 3: Compute Relevance Scores
+    relevance_scores = cosine_similarity(candidate_embeddings_array, [document_embedding]).flatten()
+    candidates_relevance = dict(zip([kp.lower() for kp in candidate_keyphrases], relevance_scores))
+
+    # Step 4: Compute Pairwise Similarities
+    similarity_matrix = cosine_similarity(candidate_embeddings_array)
+
+    # Plot and save the similarity matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(similarity_matrix, annot=False, cmap='viridis')
+    plt.title('Candidate Keyphrase Similarity Matrix')
+    plt.xlabel('Candidate Keyphrases')
+    plt.ylabel('Candidate Keyphrases')
+    plt.savefig('similarity_matrix.png')
+    plt.close()
+
+    # Step 5: Implement the Greedy Algorithm for SFO
+    selected_keyphrases = []
+    selected_indices = []
+    remaining_indices = list(range(len(candidate_keyphrases)))
+
+    for _ in range(min(N, len(candidate_keyphrases))):
+        max_score = -np.inf
+        best_candidate = None
+
+        for idx in remaining_indices:
+            candidate = candidate_keyphrases[idx].lower()
+            relevance = candidates_relevance[candidate]
+
+            # Diversity penalty
+            diversity_penalty = 0
+            for selected_idx in selected_indices:
+                similarity = similarity_matrix[idx][selected_idx]
+                diversity_penalty += similarity
+
+            # Marginal gain
+            marginal_gain = relevance - alpha * diversity_penalty
+
+            if marginal_gain > max_score:
+                max_score = marginal_gain
+                best_candidate = idx
+
+        # Add the best candidate to the selected list
+        selected_keyphrases.append(candidate_keyphrases[best_candidate].lower())  # Convert to lowercase for consistency
+        selected_indices.append(best_candidate)
+        remaining_indices.remove(best_candidate)
+
+    return selected_keyphrases, candidate_embeddings
+
+# Function to compute Intra-List Distance (ILD)
+def compute_ild(selected_keyphrases, candidate_embeddings):
+    N = len(selected_keyphrases)
+    if N < 2:
+        return 0.0  # ILD is undefined for fewer than two keyphrases
+
+    embeddings = [candidate_embeddings[kp] for kp in selected_keyphrases]
+    similarity_matrix = cosine_similarity(embeddings)
+    dissimilarities = 1 - similarity_matrix
+    sum_dissimilarity = np.sum(np.triu(dissimilarities, k=1))
+    ild = (2 / (N * (N - 1))) * sum_dissimilarity
+    return ild
+
+# Function to compute Redundancy Rate (RR)
+def compute_rr(selected_keyphrases, candidate_embeddings, threshold=0.8):
+    N = len(selected_keyphrases)
+    if N < 2:
+        return 0.0  # RR is undefined for fewer than two keyphrases
+
+    embeddings = [candidate_embeddings[kp] for kp in selected_keyphrases]
+    similarity_matrix = cosine_similarity(embeddings)
+    redundant_pairs = sum(
+        1 for i in range(N) for j in range(i + 1, N) if similarity_matrix[i][j] >= threshold
+    )
+    num_pairs = N * (N - 1) / 2
+    rr = redundant_pairs / num_pairs
+    return rr
+
+# Function to compute Subtopic Recall (SR)
+def compute_sr(selected_keyphrases, reference_keyphrases, candidate_embeddings, num_clusters=None):
+    combined_keyphrases = list(set(selected_keyphrases + reference_keyphrases))
+    embeddings = [candidate_embeddings.get(kp) for kp in combined_keyphrases]
+
+    # Remove any None embeddings
+    valid_indices = [i for i, emb in enumerate(embeddings) if emb is not None]
+    embeddings = [embeddings[i] for i in valid_indices]
+    combined_keyphrases = [combined_keyphrases[i] for i in valid_indices]
+
+    if num_clusters is None:
+        num_clusters = min(len(combined_keyphrases) // 2, 5)  # Adjust as needed
+        num_clusters = max(num_clusters, 1)  # Ensure at least one cluster
+
+    if len(embeddings) == 0:
+        return 0.0  # No embeddings to cluster
+
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init='auto')
+    labels = kmeans.fit_predict(embeddings)
+    keyphrase_clusters = dict(zip(combined_keyphrases, labels))
+
+    reference_subtopics = {keyphrase_clusters.get(kp, -1) for kp in reference_keyphrases}
+    reference_subtopics.discard(-1)  # Remove any missing keyphrases
+    total_subtopics = len(reference_subtopics)
+
+    selected_subtopics = {keyphrase_clusters.get(kp, -1) for kp in selected_keyphrases}
+    selected_subtopics.discard(-1)
+
+    if total_subtopics == 0:
+        sr = 0.0
+    else:
+        sr = len(selected_subtopics & reference_subtopics) / total_subtopics
+    return sr
+
+# Function to compute matches based on semantic similarity
+def evaluate_extraction(selected_keyphrases, reference_keyphrases, candidate_embeddings, threshold=0.5):
+    # Normalize selected keyphrases
+    normalized_selected_kps = [normalize_keyphrase(kp) for kp in selected_keyphrases]
+
+    # Normalize reference keyphrases
+    normalized_reference_kps = [normalize_keyphrase(kp) for kp in reference_keyphrases]
+
+    # Debugging information
+    #print(f"Selected KPs: {normalized_selected_kps}")
+    #print(f"Reference KPs: {normalized_reference_kps}")
+
+    # Compute number of correctly extracted keyphrases using semantic similarity
+    correct_matches = set()
+    for selected_kp in normalized_selected_kps:
+        if selected_kp in candidate_embeddings:
+            selected_embedding = candidate_embeddings[selected_kp].reshape(1, -1)
+            for ref_kp in normalized_reference_kps:
+                if ref_kp in candidate_embeddings:
+                    ref_embedding = candidate_embeddings[ref_kp].reshape(1, -1)
+                    similarity = cosine_similarity(selected_embedding, ref_embedding)[0][0]
+                    if similarity >= threshold:
+                        correct_matches.add(ref_kp)
+
+    num_correct = len(correct_matches)
+
+    # Debugging information for empty correct matches
+    #if len(correct_matches) == 0:
+    #    print("No matches found. Possible reasons: differences in lemmatization, tokenization, or formatting.")
+
+    # Compute Precision, Recall, F1 Score
+    precision = num_correct / len(normalized_selected_kps) if len(normalized_selected_kps) > 0 else 0
+    recall = num_correct / len(normalized_reference_kps) if len(normalized_reference_kps) > 0 else 0
+    if precision + recall > 0:
+        f1_score = 2 * precision * recall / (precision + recall)
+    else:
+        f1_score = 0.0
+
+    return precision, recall, f1_score, correct_matches
+
+# Function to process a dataset
+def process_dataset(dataset_name, documents, references, N=5, alpha=0.5):
+    print(f"\nProcessing dataset: {dataset_name}")
+    total_precision = 0.0
+    total_recall = 0.0
+    total_f1 = 0.0
+    total_time = 0.0
+    total_ild = 0.0
+    total_rr = 0.0
+    total_sr = 0.0
+    num_docs = len(documents)
+
+    for i in range(num_docs):
+        document = documents[i]
+        reference_keyphrases = references[i]
+
+        start_time = time.time()
+        selected_keyphrases, candidate_embeddings = extract_keyphrases(document, N=N, alpha=alpha)
+        end_time = time.time()
+        runtime = end_time - start_time
+        total_time += runtime
+
+        precision, recall, f1_score, correct_matches = evaluate_extraction(selected_keyphrases, reference_keyphrases, candidate_embeddings)
+
+        total_precision += precision
+        total_recall += recall
+        total_f1 += f1_score
+
+        # Compute Diversity Metrics
+        # Ensure embeddings for reference keyphrases are available
+        missing_keyphrases = set(reference_keyphrases) - set(candidate_embeddings.keys())
+        if missing_keyphrases:
+            missing_embeddings = model.encode(list(missing_keyphrases))
+            for kp, emb in zip(missing_keyphrases, missing_embeddings):
+                candidate_embeddings[kp] = emb
+
+        # Compute ILD
+        ild_score = compute_ild(selected_keyphrases, candidate_embeddings)
+        # Compute RR
+        rr_score = compute_rr(selected_keyphrases, candidate_embeddings, threshold=0.7)
+        # Compute SR
+        sr_score = compute_sr(selected_keyphrases, reference_keyphrases, candidate_embeddings)
+
+        total_ild += ild_score
+        total_rr += rr_score
+        total_sr += sr_score
+
+        # Output for each document
+        #print(f"\nDocument {i+1}:")
+        #print(f"Selected Keyphrases: {selected_keyphrases}")
+        #print(f"Correctly Matched Keyphrases: {correct_matches}")
+        #print(f"Precision: {precision:.4f}, Recall: {recall:.4f}, F1 Score: {f1_score:.4f}, Runtime: {runtime:.4f} seconds")
+        #print(f"Intra-List Distance (ILD): {ild_score:.4f}")
+        #print(f"Redundancy Rate (RR): {rr_score:.4f}")
+        #print(f"Subtopic Recall (SR): {sr_score:.4f}")
+
+    avg_precision = total_precision / num_docs
+    avg_recall = total_recall / num_docs
+    avg_f1 = total_f1 / num_docs
+    avg_time = total_time / num_docs
+    avg_ild = total_ild / num_docs
+    avg_rr = total_rr / num_docs
+    avg_sr = total_sr / num_docs
+
+    print(f"\nDataset: {dataset_name} Summary")
+    print(f"Average Precision@{N}: {avg_precision:.4f}")
+    print(f"Average Recall@{N}: {avg_recall:.4f}")
+    print(f"Average F1-Score@{N}: {avg_f1:.4f}")
+    print(f"Average ILD: {avg_ild:.4f}")
+    print(f"Average RR: {avg_rr:.4f}")
+    print(f"Average SR: {avg_sr:.4f}")
+    print(f"Average Runtime per Document: {avg_time:.4f} seconds")
+
+# Main function to process all datasets
+def main():
+    N = 5  # Number of keyphrases to select
+    alpha = 0.1  # Trade-off parameter between relevance and diversity
+
+    dataset_names = ['memray/semeval', 'memray/nus', 'memray/inspec']
+
+    for dataset_name in dataset_names:
+        try:
+            dataset = load_dataset(dataset_name, split="test")
+            documents, references = prepare_data(dataset)
+            process_dataset(dataset_name, documents, references, N=N, alpha=alpha)
+        except FileNotFoundError as e:
+            print(e)
+
+if __name__ == "__main__":
+    main()
