@@ -54,6 +54,7 @@ You can use the script `DatasetMetrics.py` provided in this repository. To run t
 
 ```bash
 python DatasetMetrics.py --dataset <dataset_name>
+```
 
 ## How to Run
 
@@ -61,3 +62,4 @@ To execute the main script, simply run:
 
 ```bash
 python sfoOnRealDataset.py
+```
