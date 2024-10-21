@@ -61,15 +61,3 @@ To execute the main script, simply run:
 
 ```bash
 python sfoOnRealDataset.py
-
-## Citation
-If you find this repository helpful for your work, please cite our project:
-
-text
-@misc{Coming Soon}
-License
-This repository is licensed under the MIT License. See LICENSE for more details.
-
-css
-
-This version adds a section on how to measure the GKP, KPL, and DL metrics using the `DatasetMetrics.py` script. It provides a simple instruction on how to run it and what to expect.
