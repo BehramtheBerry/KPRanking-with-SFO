@@ -23,8 +23,8 @@ To run this project locally, follow these steps:
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/yourusername/your-repository-name.git
-    cd your-repository-name
+    git clone https://github.com/yourusername/KPRanking-with-SFO.git
+    cd KPRanking-with-SFO-main
     ```
 
 2. Create a virtual environment and activate it:
@@ -47,4 +47,4 @@ To run this project locally, follow these steps:
 To execute the main script, simply run:
 
 ```bash
-python main.py
+python sfoOnRealDataset.py
