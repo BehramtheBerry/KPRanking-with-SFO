@@ -1,6 +1,9 @@
 # Keyphrase Ranking with Submodular Function Optimization (SFO)
 
-This repository contains code for ranking keyphrases using Submodular Function Optimization (SFO) for balancing relevance and diversity. The repository uses publicly available datasets and the `MiniLM` pre-trained sentence transformer model for embedding generation.
+This repository contains code for ranking keyphrases using Submodular Function Optimization (SFO) to balance relevance and diversity. It uses publicly available datasets and the `MiniLM` pre-trained sentence transformer model for embedding generation.
+
+![Architecture](https://github.com/user-attachments/assets/b05e185c-a702-4e71-b9b8-f7e9c216dce8)
+
 
 ## Datasets
 
