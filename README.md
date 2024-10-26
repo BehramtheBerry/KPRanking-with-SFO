@@ -1,4 +1,3 @@
-```markdown
 # Keyphrase Ranking with Submodular Function Optimization (SFO)
 
 This repository contains code for ranking keyphrases using Submodular Function Optimization (SFO) to balance relevance and diversity. It uses publicly available datasets and the `MiniLM` pre-trained sentence transformer model for embedding generation.
@@ -57,58 +56,3 @@ You can use the script `DatasetMetrics.py` provided in this repository. To run t
 
 ```bash
 python DatasetMetrics.py --dataset <dataset_name>
-```
-
-## How to Run
-
-To execute the main script, simply run:
-
-```bash
-python sfoOnRealDataset.py
-```
-
-## Pseudocode for SFO Keyphrase Ranking
-
-The following pseudocode outlines our Submodular Function Optimization (SFO) approach for balancing relevance and diversity in keyphrase selection.
-
-```
-Initialize S = ∅
-While |S| < N:
-    For each keyphrase kp in V \ S:
-        Calculate marginal gain Δf(kp | S)
-        Apply diversity penalty using α
-    Select kp* that maximizes Δf(kp | S) - α * DiversityPenalty(kp, S)
-    Update S = S ∪ {kp*}
-Return S
-```
-
-Here:
-- \( V \) is the set of candidate keyphrases.
-- \( N \) is the desired number of keyphrases.
-- \( \alpha \) is a parameter that adjusts the balance between relevance and diversity.
-
-## Experimental Results
-
-Our model was evaluated on three datasets, comparing F1-Score@5, Intra-List Distance (ILD), Subtopic Recall (SR), and average runtime against three baselines: EmbedRank++, SIFRank, and DPP. The performance of our method in each metric is summarized below.
-
-| Dataset  | Method        | F1-Score@5 | ILD   | SR    | Runtime per Doc (s) |
-|----------|---------------|------------|-------|-------|----------------------|
-| Inspec   | **SFO**       | **32.46**  | 0.77  | 0.85  | 0.3656              |
-|          | EmbedRank++   | 29.88      | 0.73  | 0.78  | 0.1882              |
-|          | SIFRank       | 28.49      | 0.77  | 0.84  | 0.6443              |
-|          | DPP           | 30.42      | 0.74  | 0.80  | 1.2433              |
-| NUS      | **SFO**       | **41.72**  | 0.86  | 0.79  | 2.3251              |
-|          | EmbedRank++   | 37.09      | 0.76  | 0.38  | 7.1397              |
-|          | SIFRank       | 36.77      | 0.31  | 0.60  | 19.2913             |
-|          | DPP           | 36.80      | 0.20  | 0.31  | 1.8312              |
-| SemEval  | **SFO**       | **44.43**  | 0.86  | 0.73  | 2.4978              |
-|          | EmbedRank++   | 38.40      | 0.74  | 0.38  | 7.4637              |
-|          | SIFRank       | 38.82      | 0.29  | 0.46  | 20.6732             |
-|          | DPP           | 40.31      | 0.20  | 0.46  | 2.0910              |
-
-These results demonstrate that SFO outperforms the baselines in F1-Score@5 and diversity measures, with competitive runtime efficiency.
-``` 
-
----
-
-This `README.md` provides clear steps, the methodology pseudocode, and summarized experimental results. The table showcases key performance metrics, with SFO's results highlighted for clarity.
