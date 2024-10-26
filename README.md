@@ -4,6 +4,8 @@ This repository contains code for ranking keyphrases using Submodular Function O
 
 ![Architecture](https://github.com/user-attachments/assets/1c6d6720-cbc7-41a0-a28c-3cf7b1cb936b)
 
+
+
 ## Datasets
 
 We have used the following datasets for this project:
@@ -56,3 +58,12 @@ You can use the script `DatasetMetrics.py` provided in this repository. To run t
 
 ```bash
 python DatasetMetrics.py --dataset <dataset_name>
+```
+
+## How to Run
+
+To execute the main script, simply run:
+
+```bash
+python sfoOnRealDataset.py
+```
