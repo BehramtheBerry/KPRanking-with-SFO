@@ -99,7 +99,7 @@ Our model was evaluated on three datasets, comparing F1-Score@5, Intra-List Dist
 |          | DPP           | 23.82      | 0.2015  | 0.4618  | 2.0910              |
 
 
-These results demonstrate that SFO outperforms the baselines in F1-Score@5 and diversity measures, with competitive runtime efficiency.
+These results demonstrate that SFO outperforms the baselines in diversity measures with competitive runtime efficiency.
 
 ## Citation
 
