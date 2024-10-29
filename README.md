@@ -104,7 +104,7 @@ These results demonstrate that SFO outperforms the baselines in diversity measur
 ## Citation
 
 If you find this repository helpful in your research, please consider citing our work:
-
+text
 @misc{umair2024optimizingkeyphraserankingrelevance,
       title={Optimizing Keyphrase Ranking for Relevance and Diversity Using Submodular Function Optimization (SFO)}, 
       author={Muhammad Umair and Syed Jalaluddin Hashmi and Young-Koo Lee},
