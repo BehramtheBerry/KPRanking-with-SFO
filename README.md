@@ -2,8 +2,6 @@
 
 The source code for Keyphrase Ranking with SFO paper accepted in KDBC 2024
 
-This repository contains code for ranking keyphrases using Submodular Function Optimization (SFO) to balance relevance and diversity. It uses publicly available datasets and the `MiniLM` pre-trained sentence transformer model for embedding generation.
-
 ![Architecture](https://github.com/user-attachments/assets/1c6d6720-cbc7-41a0-a28c-3cf7b1cb936b)
 
 
