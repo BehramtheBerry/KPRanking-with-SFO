@@ -1,10 +1,10 @@
 # Keyphrase Ranking with Submodular Function Optimization (SFO)
 
-The source code for Keyphrase Ranking with SFO paper accepted in KDBC 2024
+The source code for [Keyphrase Ranking with SFO](https://arxiv.org/abs/2410.20080) paper accepted in KDBC 2024
+
+---
 
 ![Architecture](https://github.com/user-attachments/assets/1c6d6720-cbc7-41a0-a28c-3cf7b1cb936b)
-
-
 
 ## Datasets
 
